@@ -12,6 +12,10 @@
 
 	<repositories>
 		<repository>
+			<id>vg-corporate-repo</id>
+			<url>http://kote.videogorillas.com/m2repo/</url>
+		</repository>
+		<repository>
 			<id>central</id>
 			<name>Maven Repository Switchboard</name>
 			<layout>default</layout>
