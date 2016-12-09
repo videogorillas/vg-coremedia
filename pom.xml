@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.vg</groupId>
 	<artifactId>coremedia</artifactId>
-	<version>0.0.1</version>
+	<version>0.0.2</version>
 	<properties>
 		<stjs.version>3.3.0</stjs.version>
 		<stjs.plugin.version>3.3.0</stjs.plugin.version>
@@ -189,11 +189,12 @@
 			<artifactId>gson</artifactId>
 			<version>2.3.1</version>
 		</dependency>
-		<dependency>
-			<groupId>org.jcodec</groupId>
-			<artifactId>jcodec</artifactId>
-			<version>0.2.0-vg7</version>
-		</dependency>
+        <dependency>
+            <groupId>org.jcodec</groupId>
+            <artifactId>jcodec</artifactId>
+            <!--  https://github.com/jcodec/jcodec/tree/0.2.0-vg4  -->
+            <version>0.2.0-vg7</version>
+        </dependency>
 		<dependency>
 			<groupId>seekable-io</groupId>
 			<artifactId>seekable-io</artifactId>
