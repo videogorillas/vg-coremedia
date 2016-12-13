@@ -1,4 +1,4 @@
-package com.vg.live;
+package com.vg.cloud.dash;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;

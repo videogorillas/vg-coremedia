@@ -1,4 +1,4 @@
-package com.vg.live;
+package com.vg.cloud.dash;
 
 import java.util.List;
 
