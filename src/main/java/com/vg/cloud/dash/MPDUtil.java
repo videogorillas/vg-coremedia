@@ -5,6 +5,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toMap;
 
 import java.io.File;
+import java.io.StringWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -17,6 +18,7 @@ import java.util.regex.Pattern;
 
 import com.vg.ListUtils;
 import com.vg.Utils;
+
 import org.junit.Test;
 import org.simpleframework.xml.core.Persister;
 
@@ -337,4 +339,14 @@ public class MPDUtil {
         return mpd;
     }
 
+    public static String asString(MPD mpd) {
+        StringWriter stringWriter = new StringWriter();
+        try {
+            new Persister().write(mpd, stringWriter);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+        return stringWriter.toString();
+    }
 }
