@@ -5,10 +5,10 @@
 	<groupId>com.vg</groupId>
 	<artifactId>coremedia</artifactId>
 	<version>0.0.5-SNAPSHOT</version>
-	<properties>
-		<stjs.version>3.3.0</stjs.version>
-		<stjs.plugin.version>3.3.0</stjs.plugin.version>
-	</properties>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <retrolambda.plugin.version>2.5.1</retrolambda.plugin.version>
+    </properties>
 
 	<repositories>
 		<repository>
@@ -34,43 +34,6 @@
 			</extension>
 		</extensions>
 		<plugins>
-			<plugin>
-				<groupId>org.st-js</groupId>
-				<artifactId>stjs-maven-plugin</artifactId>
-				<version>${stjs.plugin.version}</version>
-				<executions>
-					<execution>
-						<id>main</id>
-						<goals>
-							<goal>generate</goal>
-							<goal>generate-test</goal>
-							<goal>copy-js</goal>
-						</goals>
-						<configuration>
-							<pack>true</pack>
-							<generateSourceMap>true</generateSourceMap>
-							<!-- buildOutputDirectory>target/classes/myjs</buildOutputDirectory -->
-							<generatedSourcesDirectory>target/classes/static/js</generatedSourcesDirectory>
-						</configuration>
-					</execution>
-					<!-- if you use the JUnit runner -->
-					<execution>
-						<id>test</id>
-						<goals>
-							<goal>generate-test</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<includes>
-						<include>com/vg/cloud/js/**/*.java</include>
-						<include>com/vg/cloud/model/**/*.java</include>
-						<include>com/vg/transcoder/frontend/**/*.java</include>
-						<include>com/vg/transcoder/shared/**/*.java</include>
-					</includes>
-					<!-- buildOutputDirectory>target/classes/myjs</buildOutputDirectory -->
-				</configuration>
-			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
@@ -121,133 +84,76 @@
 					<target>1.8</target>
 				</configuration>
 			</plugin>
+            <plugin>
+                <groupId>net.orfjackal.retrolambda</groupId>
+                <artifactId>retrolambda-maven-plugin</artifactId>
+                <version>${retrolambda.plugin.version}</version>
+                <executions>
+                    <!-- https://stackoverflow.com/questions/6352208/how-to-solve-plugin-execution-not-covered-by-lifecycle-configuration-for-sprin -->
+                    <execution>
+                        <id>retrolambda main</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>process-main</goal>
+                            <!-- <goal>process-test</goal> -->
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <target>1.7</target>
+                    <defaultMethods>true</defaultMethods>
+                </configuration>
+            </plugin>
 		</plugins>
-		<pluginManagement>
-			<plugins>
-				<!-- configuration for maven plugin 1.0.0 for automatic code generation -->
-				<plugin>
-					<groupId>org.eclipse.m2e</groupId>
-					<artifactId>lifecycle-mapping</artifactId>
-					<version>1.0.0</version>
-					<configuration>
-						<lifecycleMappingMetadata>
-							<pluginExecutions>
-								<pluginExecution>
-									<pluginExecutionFilter>
-										<groupId>org.st-js</groupId>
-										<artifactId>
-											stjs-maven-plugin
-										</artifactId>
-										<versionRange>
-											[${stjs.plugin.version},)
-										</versionRange>
-										<goals>
-											<goal>generate</goal>
-											<goal>generate-test</goal>
-										</goals>
-									</pluginExecutionFilter>
-									<action>
-										<execute>
-											<runOnIncremental>true</runOnIncremental>
-										</execute>
-									</action>
-								</pluginExecution>
-							</pluginExecutions>
-						</lifecycleMappingMetadata>
-					</configuration>
-				</plugin>
-			</plugins>
-		</pluginManagement>
 	</build>
 
 	<dependencies>
 		<dependency>
-			<groupId>org.st-js.bridge</groupId>
-			<artifactId>html</artifactId>
-			<version>5.0.bv16-44</version>
-		</dependency>
-		<dependency>
-			<groupId>org.st-js.bridge</groupId>
-			<artifactId>react</artifactId>
-			<version>0.14.8.bv6-16</version>
-		</dependency>
-		<dependency>
-			<groupId>org.simpleframework</groupId>
-			<artifactId>simple-xml</artifactId>
-			<version>2.7.1</version>
-		</dependency>
-		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.12</version>
+            <scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
-			<version>3.4</version>
+			<version>3.5</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
 			<artifactId>commons-io</artifactId>
 			<version>2.4</version>
 		</dependency>
-		<dependency>
-			<groupId>com.google.code.gson</groupId>
-			<artifactId>gson</artifactId>
-			<version>2.3.1</version>
-		</dependency>
         <dependency>
             <groupId>org.jcodec</groupId>
             <artifactId>jcodec</artifactId>
             <!--  https://github.com/jcodec/jcodec/tree/0.2.0-vg4  -->
-            <version>0.2.0-vg7</version>
+			<version>0.2.0-vg9</version>
         </dependency>
-		<dependency>
-			<groupId>seekable-io</groupId>
-			<artifactId>seekable-io</artifactId>
-			<version>1.0.5</version>
-		</dependency>
-		<dependency>
-			<groupId>io.reactivex</groupId>
-			<artifactId>rxjava</artifactId>
-			<version>1.1.3</version>
-		</dependency>
-		<dependency>
-			<groupId>com.vg</groupId>
-			<artifactId>rxjs-bridge</artifactId>
-			<version>0.0.9</version>
-		</dependency>
-		<dependency>
-			<groupId>com.vg</groupId>
-			<artifactId>nodejs-bridge</artifactId>
-			<version>5.10.2</version>
-		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>18.0</version>
+			<version>20.0</version>
 		</dependency>
-		<dependency>
-			<groupId>javolution</groupId>
-			<artifactId>javolution</artifactId>
-			<version>5.4.5</version>
-		</dependency>
-		<dependency>
-			<groupId>jflac</groupId>
-			<artifactId>jflac-codec</artifactId>
-			<version>1.4.0</version>
-		</dependency>
-		<dependency>
-			<groupId>net.java.dev.jna</groupId>
-			<artifactId>jna</artifactId>
-			<version>3.3.0</version>
-		</dependency>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.13</version>
-			<type>jar</type>
-		</dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>2.7.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp</groupId>
+            <artifactId>okhttp-ws</artifactId>
+            <version>2.7.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.davidmoten</groupId>
+            <artifactId>rxjava-extras</artifactId>
+            <version>0.8.0.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.25</version>
+        </dependency>
 	</dependencies>
-
 </project>
