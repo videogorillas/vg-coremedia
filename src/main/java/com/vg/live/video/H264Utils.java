@@ -6,11 +6,15 @@ import java.util.List;
 
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
+import org.jcodec.codecs.h264.io.model.PictureParameterSet;
+import org.jcodec.codecs.h264.io.model.SeqParameterSet;
+
+import com.vg.live.worker.Allocator;
 
 public class H264Utils {
 
     public static List<NAL> splitNalUnits(ByteBuffer raw264) {
-        List<NAL> bufs = new ArrayList<NAL>();
+        List<NAL> bufs = new ArrayList<>();
         int pos = raw264.position();
         int lim = raw264.limit();
         int prevPos = -1;
@@ -66,5 +70,21 @@ public class H264Utils {
             return findFirst(nals, NALUnitType.IDR_SLICE) != null;
         }
         return false;
+    }
+
+    public static PictureParameterSet readPps(ByteBuffer ppsBuf, Allocator alloc) {
+        ByteBuffer escaped = alloc.copy(ppsBuf);
+        org.jcodec.codecs.h264.H264Utils.unescapeNAL(escaped);
+        PictureParameterSet pps = PictureParameterSet.read(escaped);
+        alloc.release(escaped);
+        return pps;
+    }
+
+    public static SeqParameterSet readSps(ByteBuffer buf, Allocator alloc) {
+        ByteBuffer escaped = alloc.copy(buf);
+        org.jcodec.codecs.h264.H264Utils.unescapeNAL(escaped);
+        SeqParameterSet sps = SeqParameterSet.read(escaped);
+        alloc.release(escaped);
+        return sps;
     }
 }
