@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.jcodec.containers.mp4.TrackType;
+import org.jcodec.containers.mp4.MP4TrackType;
 import org.jcodec.containers.mp4.boxes.DataInfoBox;
 import org.jcodec.containers.mp4.boxes.DataRefBox;
 import org.jcodec.containers.mp4.boxes.Edit;
@@ -290,7 +290,7 @@ public class RxDash {
 
     public static TrakBox createTrack(int trackId, AVFrame frame) {
         Dimension dim = frame.isVideo() ? frame.getVideoDimension() : new Dimension(0, 0);
-        TrackType type = frame.isVideo() ? TrackType.VIDEO : TrackType.SOUND;
+        MP4TrackType type = frame.isVideo() ? MP4TrackType.VIDEO : MP4TrackType.SOUND;
         SampleEntry sampleEntry = frame.isVideo() ? videoSampleEntry(frame) : audioSampleEntry(frame.adtsHeader);
         int timescale = checkedCast(frame.timescale);
 
@@ -329,7 +329,7 @@ public class RxDash {
         return dinf;
     }
 
-    public static HandlerBox createHandler(TrackType type) {
+    public static HandlerBox createHandler(MP4TrackType type) {
         return HandlerBox.createHandlerBox("mhlr", type.getHandler(), "appl", 0, 0);
     }
 

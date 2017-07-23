@@ -1,7 +1,5 @@
 package com.vg.live;
 
-import com.vg.util.TimeUtil;
-
 import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.common.model.Packet;
 import org.jcodec.containers.mp4.MP4Util;
@@ -13,7 +11,6 @@ import org.jcodec.containers.mp4.boxes.MediaBox;
 import org.jcodec.containers.mp4.boxes.MediaHeaderBox;
 import org.jcodec.containers.mp4.boxes.MovieBox;
 import org.jcodec.containers.mp4.boxes.MovieExtendsBox;
-import org.jcodec.containers.mp4.boxes.MovieExtendsHeaderBox;
 import org.jcodec.containers.mp4.boxes.MovieFragmentBox;
 import org.jcodec.containers.mp4.boxes.MovieFragmentHeaderBox;
 import org.jcodec.containers.mp4.boxes.MovieHeaderBox;
@@ -30,6 +27,8 @@ import org.jcodec.containers.mp4.boxes.TrackFragmentBaseMediaDecodeTimeBox;
 import org.jcodec.containers.mp4.boxes.TrackHeaderBox;
 import org.jcodec.containers.mp4.boxes.TrakBox;
 import org.jcodec.containers.mp4.demuxer.AbstractMP4DemuxerTrack;
+
+import com.vg.util.HexDump;
 
 import java.io.File;
 import java.io.IOException;
@@ -162,6 +161,9 @@ public class DashUtil {
         int prevPosition = -1;
         int currPosition;
 
+        if (buf.remaining() <= 4 || buf.getInt(buf.position()) != 0x00000001) {
+            return;
+        }
         while (buf.hasRemaining()) {
             H264Utils.skipToNALUnit(buf);
             currPosition = buf.position();
