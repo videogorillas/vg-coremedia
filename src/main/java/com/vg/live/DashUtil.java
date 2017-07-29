@@ -28,8 +28,6 @@ import org.jcodec.containers.mp4.boxes.TrackHeaderBox;
 import org.jcodec.containers.mp4.boxes.TrakBox;
 import org.jcodec.containers.mp4.demuxer.AbstractMP4DemuxerTrack;
 
-import com.vg.util.HexDump;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
