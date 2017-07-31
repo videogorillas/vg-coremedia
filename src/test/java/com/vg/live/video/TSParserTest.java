@@ -1,48 +1,34 @@
 package com.vg.live.video;
 
+import static java.lang.Integer.parseInt;
+import static java.util.Arrays.sort;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.common.LongArrayList;
 import org.jcodec.common.io.NIOUtils;
 import org.jcodec.common.tools.MD5;
-import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.io.Files;
 import com.vg.live.video.H264Utils;
 import com.vg.live.video.NAL;
 import com.vg.live.video.TSParser;
 
 public class TSParserTest {
-    static FileFilter endsWithTs = new FileFilter() {
-        @Override
-        public boolean accept(File pathname) {
-            return pathname.getName().endsWith(".ts");
-        }
-    };
-
     @Test
     public void testRaw264() throws Exception {
         File dir = new File("testdata/25fps");
-        File[] listFiles = dir.listFiles(endsWithTs);
-        Arrays.sort(listFiles, new Comparator<File>() {
-            @Override
-            public int compare(File o1, File o2) {
-                return Integer.parseInt(o1.getName().split("\\.")[0]) - Integer.parseInt(o2.getName().split("\\.")[0]);
-            }
-        });
-        Assert.assertTrue(listFiles.length > 0);
+        File[] listFiles = dir.listFiles(f -> f.getName().endsWith(".ts"));
+        sort(listFiles, (o1, o2) -> parseInt(o1.getName().split("\\.")[0]) - parseInt(o2.getName().split("\\.")[0]));
+        assertTrue(listFiles.length > 0);
 
         long expectedFirstPts[] = new long[] { 7305792, 7334592, 7363392, 7392192, 7420992, 7449792, 7478592, 7507392,
                 7536192, 7564992, 7593792, 7622592, 7651392, 7680192, 7708992, 7737792, 7766592, 7795392, 0, 7852992, };
@@ -62,20 +48,13 @@ public class TSParserTest {
         TSParser parser = new TSParser();
         for (int i = 0; i < listFiles.length; i++) {
             File file = listFiles[i];
-            ByteBuffer mmap = mmap(file);
+            ByteBuffer mmap = Files.map(file, MapMode.READ_ONLY);
             ByteBuffer raw264 = ByteBuffer.allocate(mmap.capacity());
             long firstPts = parser.raw264(mmap, raw264);
             assertEquals(expectedFirstPts[i], firstPts);
             assertEquals(expectedRemaining[i], raw264.remaining());
             assertEquals(expectedMD5[i], MD5.md5sum(raw264));
         }
-    }
-
-    private ByteBuffer mmap(File file) throws FileNotFoundException, IOException {
-        FileInputStream fileInputStream = new FileInputStream(file);
-        ByteBuffer mmap = fileInputStream.getChannel().map(MapMode.READ_ONLY, 0, file.length());
-        fileInputStream.close();
-        return mmap;
     }
 
     @Test
@@ -88,7 +67,7 @@ public class TSParserTest {
         System.out.println(raw264);
         long[] expectedTimestamps = new long[] { 7305792, 7309392, 7312992, 7316592, 7320192, 7323792, 7327392,
                 7330992 };
-        Assert.assertArrayEquals(expectedTimestamps, timestamps.toArray());
+        assertArrayEquals(expectedTimestamps, timestamps.toArray());
         List<NAL> splitNalUnits = H264Utils.splitNalUnits(raw264);
         int pictures = 0;
         for (NAL nal : splitNalUnits) {
@@ -107,7 +86,7 @@ public class TSParserTest {
         List<ByteBuffer> videoFramePackets = p.getVideoFramePackets(ts, timestamps);
         long[] expectedTimestamps = new long[] { 7305792, 7309392, 7312992, 7316592, 7320192, 7323792, 7327392,
                 7330992 };
-        Assert.assertArrayEquals(expectedTimestamps, timestamps.toArray());
+        assertArrayEquals(expectedTimestamps, timestamps.toArray());
         assertEquals(expectedTimestamps.length, videoFramePackets.size());
         for (ByteBuffer raw264 : videoFramePackets) {
             System.out.println(raw264);

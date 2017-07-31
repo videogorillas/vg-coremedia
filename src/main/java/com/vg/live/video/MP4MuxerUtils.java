@@ -15,6 +15,8 @@ import static org.jcodec.codecs.h264.H264Utils.parseAVCC;
 import static org.jcodec.codecs.h264.H264Utils.readPPSFromBufferList;
 import static org.jcodec.codecs.h264.H264Utils.readSPSFromBufferList;
 import static org.jcodec.codecs.mpeg4.mp4.EsdsBox.createEsdsBox;
+import static org.jcodec.containers.mp4.MP4TrackType.SOUND;
+import static org.jcodec.containers.mp4.MP4TrackType.VIDEO;
 import static org.jcodec.containers.mp4.boxes.AudioSampleEntry.createAudioSampleEntry;
 import static org.jcodec.containers.mp4.muxer.MP4Muxer.createMP4MuxerToChannel;
 import static rx.Observable.using;
@@ -37,10 +39,12 @@ import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
 import org.jcodec.codecs.mpeg4.mp4.EsdsBox;
+import org.jcodec.common.MuxerTrack;
 import org.jcodec.common.io.FileChannelWrapper;
 import org.jcodec.common.io.SeekableByteChannel;
+import org.jcodec.common.model.Packet.FrameType;
+import org.jcodec.common.model.TapeTimecode;
 import org.jcodec.containers.mp4.MP4Packet;
-import org.jcodec.containers.mp4.TrackType;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
 import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.Header;
@@ -52,11 +56,13 @@ import org.jcodec.containers.mp4.boxes.TrakBox;
 import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
 import org.jcodec.containers.mp4.demuxer.AbstractMP4DemuxerTrack;
 import org.jcodec.containers.mp4.demuxer.MP4Demuxer;
-import org.jcodec.containers.mp4.muxer.FramesMP4MuxerTrack;
+import org.jcodec.containers.mp4.muxer.AbstractMP4MuxerTrack;
 import org.jcodec.containers.mp4.muxer.MP4Muxer;
+import org.jcodec.containers.mp4.muxer.MP4MuxerTrack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
 import com.vg.live.worker.Allocator;
 import com.vg.live.worker.SimpleAllocator;
 
@@ -73,11 +79,31 @@ public class MP4MuxerUtils {
         return writemp4(_frames, nextFile.call());
     }
 
+    /**
+     * Works like the following:
+     * 
+     * 1. if at least one frame exists in <code>frames<code> open output file and
+     * open MP4Muxer <br>
+     * 
+     * 2. write all frames (including the first one) to MP4Muxer <br>
+     * 
+     * 3. when frames are completed: close MP4Muxer and output file channel <br>
+     * 
+     * 4. return output file as a single Observable item
+     * 
+     * @param frames
+     * @param file
+     * @return
+     */
     public static Observable<File> writemp4(Observable<AVFrame> frames, File file) {
+        return writemp4(frames, file, simpleAVTracks);
+    }
+    
+    public static Observable<File> writemp4(Observable<AVFrame> frames, File file, Func2<MP4Muxer, AVFrame, MuxerTrack> selectTrack) {
         Observable<File> compose = frames.compose(concatMapOnFirst(allFrames -> {
             Observable<MP4Muxer> _muxer = using(
                     f0(() -> new FileChannelWrapper(new FileOutputStream(file).getChannel())),
-                    f1(output -> writeFrames(allFrames, createMP4MuxerToChannel(output))),
+                    f1(output -> writeFrames(allFrames, createMP4MuxerToChannel(output), selectTrack)),
                     output -> closeQuietly(output));
             return _muxer.map(m -> file);
         }));
@@ -96,32 +122,37 @@ public class MP4MuxerUtils {
         }));
     }
 
+    final static Func2<MP4Muxer, AVFrame, MuxerTrack> simpleAVTracks = (muxer, frame) -> {
+        checkArgument(frame.isAudio() || frame.isVideo(), "unhandled frame type %s", frame);
+        if (frame.isVideo()) {
+            AbstractMP4MuxerTrack vTrack = muxer.getVideoTrack();
+            if (vTrack == null) {
+                vTrack = addVideoTrack(muxer, frame);
+            }
+            return vTrack;
+        } else if (frame.isAudio()) {
+            AbstractMP4MuxerTrack aTrack = firstElement(muxer.getAudioTracks());
+            if (aTrack == null) {
+                aTrack = addAudioTrack(muxer, frame);
+            }
+            return aTrack;
+        }
+        return null;
+    };
+
     static Observable<MP4Muxer> writeFrames(Observable<AVFrame> frames, MP4Muxer muxer) {
-        return writeFrames(frames, muxer, true);
+        return writeFrames(frames, muxer, simpleAVTracks);
     }
 
-    static Observable<MP4Muxer> writeFrames(Observable<AVFrame> frames, MP4Muxer muxer, boolean releaseFrames) {
-        Observable<MutablePair<MP4Muxer, Integer>> reduce = frames.reduce(MutablePair.of(muxer, 0), f2((p, f) -> {
-            MP4Muxer m = p.getKey();
-            if (f.isVideo()) {
-                if (f.isIFrame()) {
-                    p.right += 1;
-                }
-                FramesMP4MuxerTrack vTrack = (FramesMP4MuxerTrack) muxer.getVideoTrack();
-                if (vTrack == null) {
-                    vTrack = addVideoTrack(m, f);
-                }
-                vTrack.addFrame(mp4(f));
-            } else if (f.isAudio()) {
-                FramesMP4MuxerTrack aTrack = (FramesMP4MuxerTrack) firstElement(muxer.getAudioTracks());
-                if (aTrack == null) {
-                    aTrack = addAudioTrack(m, f);
-                }
-                aTrack.addFrame(mp4(f));
+    static Observable<MP4Muxer> writeFrames(Observable<AVFrame> frames, MP4Muxer muxer, Func2<MP4Muxer, AVFrame, MuxerTrack> selectTrack) {
+        Observable<MutablePair<MP4Muxer, Integer>> reduce = frames.reduce(MutablePair.of(muxer, 0), f2((p, frame) -> {
+            if (frame.isVideo() && frame.isIFrame()) {
+                p.right += 1;
             }
-            if (releaseFrames) {
-                //FramePool.releaseData(f);
-            }
+            MP4Muxer _muxer = p.getKey();
+            MuxerTrack track = selectTrack.call(_muxer, frame);
+            checkNotNull(track, "BUG: no track selected for frame %s", frame);
+            track.addFrame(mp4(frame));
             return p;
         }));
         return reduce.doOnNext(a1(p -> {
@@ -140,34 +171,40 @@ public class MP4MuxerUtils {
         })).map(p -> p.getKey());
     }
 
-    public static FramesMP4MuxerTrack addVideoTrack(MP4Muxer muxer, AVFrame frame) {
-        checkArgument(frame.timescale > 0, "timescale <= 0 in %s", frame);
-        FramesMP4MuxerTrack vTrack = muxer.addTrack(TrackType.VIDEO, checkedCast(frame.timescale));
-        SampleEntry sampleEntry = videoSampleEntry(frame);
-        vTrack.addSampleEntry(sampleEntry);
-        return vTrack;
+    public static AbstractMP4MuxerTrack addVideoTrack(MP4Muxer muxer, AVFrame frame) {
+        return muxer.addTrack(new MP4MuxerTrack(muxer.getNextTrackId(), VIDEO).addSampleEntry(videoSampleEntry(frame)));
     }
 
-    public static FramesMP4MuxerTrack addAudioTrack(MP4Muxer muxer, AVFrame frame) {
-        checkArgument(frame.timescale > 0, "timescale <= 0 in %s", frame);
-        FramesMP4MuxerTrack aTrack = muxer.addTrack(TrackType.SOUND, checkedCast(frame.timescale));
-        SampleEntry sampleEntry = audioSampleEntry(frame.adtsHeader);
-        aTrack.addSampleEntry(sampleEntry);
-        return aTrack;
+    public static AbstractMP4MuxerTrack addAudioTrack(MP4Muxer muxer, AVFrame frame) {
+        return muxer.addTrack(new MP4MuxerTrack(muxer.getNextTrackId(), SOUND).addSampleEntry(audioSampleEntry(frame.adtsHeader)));
     }
 
     public static MP4Packet mp4(AVFrame f) {
         checkArgument(f.timescale > 0, "timescale <= 0 in frame %s", f);
-        return new MP4Packet(f.data(), f.pts, f.timescale, Math.max(0, f.duration), 0, f.isIFrame(), null, 0, f.pts, 0,
-                0, f.data().remaining(), false);
+        ByteBuffer data = f.data();
+        long pts = f.pts;
+        int timescale = checkedCast(f.timescale);
+        long duration = Math.max(0, f.duration);
+        long frameNo = 0;
+        FrameType iframe = f.isIFrame() ? FrameType.KEY : FrameType.INTER;
+        TapeTimecode tapeTimecode = null;
+        int displayOrder = 0;
+        long mediaPts = f.pts;
+        int entryNo = 0;
+        long fileOff = f.streamOffset;
+        int size = f.data().remaining();
+        boolean psync = false;
+        return new MP4Packet(data, pts, timescale, duration, frameNo, iframe, tapeTimecode, displayOrder, mediaPts,
+                entryNo, fileOff, size, psync);
     }
 
     public static SampleEntry videoSampleEntry(AVFrame videoFrame) {
+        checkNotNull(videoFrame);
         checkNotNull(videoFrame.getSps(), "sps not found in videoFrame %s", videoFrame);
         SeqParameterSet sps = videoFrame.getSps();
         int nalLenSize = 4;
 
-        AvcCBox avcC = AvcCBox.createAvcCBox(sps.profile_idc, 0, sps.level_idc, nalLenSize, asList(videoFrame.spsBuf),
+        AvcCBox avcC = AvcCBox.createAvcCBox(sps.profileIdc, 0, sps.levelIdc, nalLenSize, asList(videoFrame.spsBuf),
                 asList(videoFrame.ppsBuf));
 
         SampleEntry sampleEntry = H264Utils.createMOVSampleEntryFromAvcC(avcC);
@@ -194,7 +231,7 @@ public class MP4MuxerUtils {
     public static Observable<AVFrame> framesFromMp4(File file, Allocator alloc) {
         Observable<AVFrame> frames = Observable.using(
                 f0(() -> new FileChannelWrapper(new FileInputStream(file).getChannel())),
-                f1(input -> MP4MuxerUtils.frames(new MP4Demuxer(input), alloc)), input -> {
+                f1(input -> MP4MuxerUtils.frames(MP4Demuxer.createRawMP4Demuxer(input), alloc)), input -> {
                     log.debug("close {}", file);
                     IOUtils.closeQuietly(input);
                 });
@@ -319,7 +356,7 @@ public class MP4MuxerUtils {
     }
 
     private static List<AbstractMP4DemuxerTrack> getAVTracks(MP4Demuxer demuxer) {
-        List<AbstractMP4DemuxerTrack> tracks = list(demuxer.getTracks());
+        List<AbstractMP4DemuxerTrack> tracks = demuxer.getTracks();
         List<AbstractMP4DemuxerTrack> avTracks = new ArrayList<>();
         for (AbstractMP4DemuxerTrack t : tracks) {
             SampleEntry se = firstElement(t.getSampleEntries());
@@ -335,8 +372,8 @@ public class MP4MuxerUtils {
 
     private static int getNextTrackId(MP4Demuxer demuxer) {
         if (demuxer == null) return 1;
-        AbstractMP4DemuxerTrack[] tracks = demuxer.getTracks();
-        if (tracks == null || tracks.length == 0)
+        List<AbstractMP4DemuxerTrack> tracks = demuxer.getTracks();
+        if (tracks.isEmpty())
             return 1;
         int max = 0;
         for (AbstractMP4DemuxerTrack track : tracks) {
@@ -348,7 +385,7 @@ public class MP4MuxerUtils {
     private static <T> List<T> list(T[] array) {
         return array != null ? Arrays.asList(array) : Collections.emptyList();
     }
-
+    
     private static <T> T firstElement(List<T> list) {
         return list != null && !list.isEmpty() ? list.get(0) : null;
         
@@ -359,7 +396,7 @@ public class MP4MuxerUtils {
 
     private static VideoSampleEntry videoSampleEntry(MP4Demuxer demuxer) {
         if (demuxer == null) return null;
-        AbstractMP4DemuxerTrack videoTrack = demuxer.getVideoTrack();
+        AbstractMP4DemuxerTrack videoTrack = (AbstractMP4DemuxerTrack) demuxer.getVideoTrack();
         if (videoTrack == null) return null;
         SampleEntry sampleEntry = firstElement(videoTrack.getSampleEntries());
         if (sampleEntry == null) return null;
@@ -371,8 +408,8 @@ public class MP4MuxerUtils {
 
     static Observable<MP4Packet> videoPackets(File file) {
         Func1<SeekableByteChannel, Observable<MP4Packet>> observableFactory = f1(input -> {
-            MP4Demuxer demuxer = new MP4Demuxer(input);
-            return com.vg.live.MP4Helper.packets(demuxer.getVideoTrack());
+            MP4Demuxer demuxer = MP4Demuxer.createRawMP4Demuxer(input);
+            return com.vg.live.MP4Helper.packets((AbstractMP4DemuxerTrack) demuxer.getVideoTrack());
         });
         return Observable.using(f0(() -> new FileChannelWrapper(new FileInputStream(file).getChannel())),
                 observableFactory, input -> closeQuietly(input));

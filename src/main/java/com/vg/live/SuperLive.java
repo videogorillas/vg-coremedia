@@ -13,6 +13,7 @@ import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.toHexString;
 import static java.lang.System.identityHashCode;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.jcodec.common.io.ByteBufferSeekableByteChannel.readFromByteBuffer;
 import static rx.Observable.just;
 import static rx.Observable.range;
 import static rx.schedulers.Schedulers.newThread;
@@ -21,10 +22,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.jcodec.common.io.ByteBufferSeekableByteChannel;
 import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
@@ -43,7 +42,6 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.ws.WebSocket;
 import com.vg.live.RxWebSocket.WebSocketEvent;
 import com.vg.live.video.AVFrame;
-import com.vg.live.video.MP4MuxerUtils;
 import com.vg.live.video.RxDash;
 import com.vg.live.worker.Allocator;
 import com.vg.live.worker.SimpleAllocator;
@@ -84,11 +82,11 @@ public class SuperLive {
         Observable<ByteBuffer> autoConnect = dashBuffers.replay(1).autoConnect(2);
 
         Observable<MovieBox> _moov = autoConnect.filter(b -> isDashinit(b)).map(f1(bb -> {
-            return MP4Util.parseMovieChannel(new ByteBufferSeekableByteChannel(bb.duplicate()));
+            return MP4Util.parseMovieChannel(readFromByteBuffer(bb.duplicate()));
         }));
 
         Observable<Pair<MP4Segment, ByteBuffer>> _m4s = autoConnect.filter(b -> !isDashinit(b)).map(f1(bb -> {
-            MP4Segment m4s = MP4Segment.parseM4S(new ByteBufferSeekableByteChannel(bb.duplicate()));
+            MP4Segment m4s = MP4Segment.parseM4S(readFromByteBuffer(bb.duplicate()));
             return Pair.of(m4s, bb);
         }));
         _moov = _moov.replay(1).autoConnect();
@@ -182,7 +180,7 @@ public class SuperLive {
     }
 
     public static boolean isDashinit(ByteBuffer bb) {
-        try (SeekableByteChannel input = new ByteBufferSeekableByteChannel(bb.duplicate());) {
+        try (SeekableByteChannel input = readFromByteBuffer(bb.duplicate());) {
             boolean dashinit = MP4Util.findFirstAtom("moov", input) != null;
             return dashinit;
         } catch (IOException e) {

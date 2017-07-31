@@ -6,7 +6,6 @@ import org.apache.commons.io.IOUtils;
 import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.common.AutoFileChannelWrapper;
 import org.jcodec.common.IntArrayList;
-import org.jcodec.common.io.ByteBufferSeekableByteChannel;
 import org.jcodec.common.io.FileChannelWrapper;
 import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.common.model.Packet;
@@ -55,6 +54,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.primitives.Ints.checkedCast;
 import static java.util.Collections.emptyMap;
 import static org.jcodec.common.IntArrayList.createIntArrayList;
+import static org.jcodec.common.io.ByteBufferSeekableByteChannel.readFromByteBuffer;
 import static org.jcodec.containers.mp4.boxes.Box.path;
 import static rx.Observable.from;
 import static rx.observables.SyncOnSubscribe.createStateless;
@@ -132,7 +132,7 @@ public class MP4Helper {
     }
     
     public static MovieBox parseMoov(ByteBuffer bb) throws IOException {
-        try (SeekableByteChannel sbc = new ByteBufferSeekableByteChannel(bb)) {
+        try (SeekableByteChannel sbc = readFromByteBuffer(bb)) {
             return MP4Util.parseMovieChannel(sbc);
         }
     }

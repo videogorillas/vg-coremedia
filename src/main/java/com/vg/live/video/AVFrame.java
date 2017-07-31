@@ -6,7 +6,12 @@ import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import java.nio.ByteBuffer;
 
 public class AVFrame {
+    public static final String VIDEO_FRAME = "V";
+    public static final String AUDIO_FRAME = "A";
+    public static final String DATA_FRAME = "F";
+    
     public final String type;
+    public int trackId;
     public long timescale;
     public long pts;
     public Long dts;
@@ -20,7 +25,7 @@ public class AVFrame {
     public transient ADTSHeader adtsHeader;
     public transient ByteBuffer spsBuf;
     public transient ByteBuffer ppsBuf;
-    private Dimension dim;
+    public Dimension dim;
     public long duration;
     public boolean iframe;
 
@@ -42,37 +47,19 @@ public class AVFrame {
 
     @Override
     public String toString() {
-        return "AVFrame{" +
-                "type='" + type + '\'' +
-                ", pts=" + pts +
-                ", duration=" + duration +
-                ", timescale=" + timescale +
-                ", streamSize=" + streamSize +
-                ", dts=" + dts +
-                ", iframe=" + iframe +
-                ", streamOffset=" + streamOffset +
-                ", _data=" + _data +
-                ", dataSize=" + dataSize +
-                ", dataOffset=" + dataOffset +
-                ", sps=" + sps +
-                ", pps=" + pps +
-                ", adtsHeader=" + adtsHeader +
-                ", spsBuf=" + spsBuf +
-                ", ppsBuf=" + ppsBuf +
-                ", dim=" + dim +
-                '}';
+        return String.format("%s[%d] pts/dts: %d%s @%d", type, trackId, pts, dts == null ? "" : "/" + dts, timescale);
     }
 
     public static AVFrame audio(long offset, int size) {
-        return new AVFrame("A", offset, size);
+        return new AVFrame(AUDIO_FRAME, offset, size);
     }
 
     public static AVFrame video(long offset, int size, boolean iframe) {
-        return new AVFrame("V", offset, size, iframe);
+        return new AVFrame(VIDEO_FRAME, offset, size, iframe);
     }
 
     public boolean isVideo() {
-        return "V".equals(type);
+        return VIDEO_FRAME.equals(type);
     }
 
     public ByteBuffer data() {
@@ -92,7 +79,7 @@ public class AVFrame {
     }
 
     public boolean isAudio() {
-        return "A".equals(type);
+        return AUDIO_FRAME.equals(type);
     }
 
     public SeqParameterSet getSps() {
@@ -107,8 +94,8 @@ public class AVFrame {
     private static Dimension dim(SeqParameterSet sps) {
         Dimension d = null;
         if (sps != null) {
-            int w = (sps.pic_width_in_mbs_minus1 + 1) << 4;
-            int h = (sps.pic_height_in_map_units_minus1 + 1) << 4;
+            int w = (sps.picWidthInMbsMinus1 + 1) << 4;
+            int h = (sps.picHeightInMapUnitsMinus1 + 1) << 4;
             d = new Dimension(w, h);
         }
         return d;
