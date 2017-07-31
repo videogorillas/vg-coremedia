@@ -7,7 +7,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.List;
@@ -49,17 +48,13 @@ public class TSParserTest {
         TSParser parser = new TSParser();
         for (int i = 0; i < listFiles.length; i++) {
             File file = listFiles[i];
-            ByteBuffer mmap = mmap(file);
+            ByteBuffer mmap = Files.map(file, MapMode.READ_ONLY);
             ByteBuffer raw264 = ByteBuffer.allocate(mmap.capacity());
             long firstPts = parser.raw264(mmap, raw264);
             assertEquals(expectedFirstPts[i], firstPts);
             assertEquals(expectedRemaining[i], raw264.remaining());
             assertEquals(expectedMD5[i], MD5.md5sum(raw264));
         }
-    }
-
-    private ByteBuffer mmap(File file) throws IOException {
-        return Files.map(file, MapMode.READ_ONLY);
     }
 
     @Test
