@@ -181,7 +181,7 @@ public class RxDash {
             trackId++;
         }
 
-        ByteBuffer tmp = mem.acquire(4096);
+        ByteBuffer tmp = mem.acquire(40960);
         m4s.styp.write(tmp);
         m4s.sidx.write(tmp);
         int sidxEndPosition = tmp.position();
