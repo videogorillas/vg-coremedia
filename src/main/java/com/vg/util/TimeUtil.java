@@ -57,11 +57,11 @@ public class TimeUtil {
         int h = (int) (sec / 3600);
 
         StringBuilder sb = new StringBuilder(12);
-        sb  = h < 10 ? sb.append(zeroToNine[h]) : sb.append(h);
+        sb  = 0 <= h && h < 10 ? sb.append(zeroToNine[h]) : sb.append(h);
         sb.append(":");
-        sb  = m < 10 ? sb.append(zeroToNine[m]) : sb.append(m);
+        sb  = 0 <= m && m < 10 ? sb.append(zeroToNine[m]) : sb.append(m);
         sb.append(":");
-        sb  = s < 10 ? sb.append(zeroToNine[s]) : sb.append(s);
+        sb  = 0 <= s && s < 10 ? sb.append(zeroToNine[s]) : sb.append(s);
         sb.append(".");
         if (ms >= 100) {
             sb.append(ms);
