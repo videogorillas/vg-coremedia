@@ -2,18 +2,26 @@ package com.vg.live;
 
 import static com.github.davidmoten.rx.Checked.f1;
 import static com.github.davidmoten.rx.Checked.f2;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.primitives.Ints.checkedCast;
+import static com.vg.live.DashUtil.createMovieHeader;
 import static com.vg.live.MP4Segment.fillArrayIfNull;
 import static com.vg.live.video.ADTSHeader.adtsFromAudioSampleEntry;
 import static com.vg.live.video.MP4MuxerUtils.concatMapOnFirst;
 import static com.vg.live.video.MP4MuxerUtils.populateSpsPps;
+import static com.vg.live.video.RxDash.createTrack;
 import static com.vg.live.video.RxDash.m4sFromFrames;
+import static com.vg.live.video.RxDash.trex;
 import static com.vg.util.MediaSeq.mediaSeq;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.toHexString;
 import static java.lang.System.identityHashCode;
+import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.jcodec.common.io.ByteBufferSeekableByteChannel.readFromByteBuffer;
+import static org.jcodec.containers.mp4.boxes.MovieExtendsBox.createMovieExtendsBox;
+import static org.jcodec.containers.mp4.boxes.MovieExtendsHeaderBox.createMovieExtendsHeaderBox;
 import static rx.Observable.just;
 import static rx.Observable.range;
 import static rx.schedulers.Schedulers.newThread;
@@ -28,7 +36,9 @@ import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
 import org.jcodec.containers.mp4.boxes.Box;
+import org.jcodec.containers.mp4.boxes.FileTypeBox;
 import org.jcodec.containers.mp4.boxes.MovieBox;
+import org.jcodec.containers.mp4.boxes.MovieExtendsBox;
 import org.jcodec.containers.mp4.boxes.NodeBox;
 import org.jcodec.containers.mp4.boxes.TrackExtendsBox;
 import org.jcodec.containers.mp4.boxes.TrakBox;
@@ -49,11 +59,25 @@ import com.vg.util.MediaSeq;
 
 import rx.Observable;
 import rx.Subscription;
+import rx.functions.Func1;
 import rx.subjects.BehaviorSubject;
 
 public class SuperLive {
-    private final static Logger log = LoggerFactory.getLogger(SuperLive.class);
+    private static final int VIDEO_TRACKID = 1;
+    private static final int AUDIO_TRACKID = 2;
+    //max number of dash chunks buffered in memory
+    private static final int MAX_DASH_BUFFERS = 128;
     private static final int DEADBEEF = 0xdeadbeef;
+    static final Logger log = LoggerFactory.getLogger(SuperLive.class);
+    public static final int FTYP = fourccToInt("ftyp");
+
+    static void debug(String string) {
+        log.debug(string);
+    }
+
+    private static void error(Object msg) {
+        log.error("{}", msg);
+    }
 
     public static ByteBuffer endOfStream() {
         ByteBuffer allocate = ByteBuffer.allocate(42);
@@ -180,14 +204,8 @@ public class SuperLive {
     }
 
     public static boolean isDashinit(ByteBuffer bb) {
-        try (SeekableByteChannel input = readFromByteBuffer(bb.duplicate());) {
-            boolean dashinit = MP4Util.findFirstAtom("moov", input) != null;
-            return dashinit;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
-
+        ByteBuffer _bb = bb.duplicate();
+        return _bb.remaining() > 8 && FTYP == _bb.order(BIG_ENDIAN).getInt(_bb.position() + 4);
     }
 
     public static Observable<ByteBuffer> videoDashBuffers(Observable<AVFrame> frames, Allocator alloc) {
@@ -273,11 +291,56 @@ public class SuperLive {
     
     //dashinit + dashchunk[0-9].m4s
     public static Observable<ByteBuffer> dashBuffers(Observable<List<AVFrame>> lists, Allocator allocator) {
-        return lists.compose(concatMapOnFirst((first, all) -> {
-            Observable<ByteBuffer> dashinit = just(RxDash.dashinit(first));
-            Observable<ByteBuffer> dashChunks = dashChunks(all, allocator);
-            return dashinit.concatWith(dashChunks);
-        }));
+        Observable<MediaSeq<List<AVFrame>>> _mseq = lists.filter(list -> list != null && !list.isEmpty()).zipWith(range(1, MAX_VALUE), (s, mseq) -> mediaSeq(mseq, s));
+        return _mseq.concatMap(new Func1<MediaSeq<List<AVFrame>>, Observable<? extends ByteBuffer>>() {
+            private MovieBox moov;
+            private MovieExtendsBox mvex;
+
+            @Override
+            public Observable<? extends ByteBuffer> call(MediaSeq<List<AVFrame>> x) {
+                int mseq = x.mseq;
+                List<AVFrame> frameList = x.value;
+
+                if (moov == null) {
+                    moov = MovieBox.createMovieBox();
+                    int timescale = frameList.stream().mapToInt(f -> checkedCast(f.timescale)).findFirst().orElse(0);
+                    checkState(timescale > 0, "BUG: no timescale for frame list %s", frameList);
+                    moov.add(createMovieHeader(timescale, 3));
+                    mvex = createMovieExtendsBox();
+                    mvex.add(createMovieExtendsHeaderBox());
+                    moov.add(mvex);
+                }
+
+                boolean hasAudio = frameList.stream().anyMatch(f -> f.isAudio());
+                boolean hasVideo = frameList.stream().anyMatch(f -> f.isVideo());
+                boolean updateVideo = hasVideo && moov.getVideoTrack() == null;
+                boolean updateAudio = hasAudio && moov.getAudioTracks().isEmpty();
+
+                if (updateVideo) {
+                    AVFrame video = frameList.stream().filter(f -> f.isVideo()).findFirst().orElse(null);
+                    checkNotNull(video, "BUG: video frame not found in frame list %s", frameList);
+                    mvex.add(RxDash.trex(VIDEO_TRACKID));
+                    moov.add(createTrack(VIDEO_TRACKID, video));
+                }
+
+                if (updateAudio) {
+                    AVFrame audio = frameList.stream().filter(f -> f.isAudio()).findFirst().orElse(null);
+                    checkNotNull(audio, "BUG: audio frame not found in frame list %s", frameList);
+                    mvex.add(RxDash.trex(AUDIO_TRACKID));
+                    moov.add(createTrack(AUDIO_TRACKID, audio));
+                }
+
+                if (updateVideo || updateAudio) {
+                    FileTypeBox ftyp = RxDash.dashFtyp();
+                    ByteBuffer dashinit = allocator.acquire(4096);
+                    ftyp.write(dashinit);
+                    moov.write(dashinit);
+                    dashinit.flip();
+                    return just(dashinit, m4sFromFrames(frameList, mseq, allocator));
+                }
+                return just(m4sFromFrames(frameList, mseq, allocator));
+            }
+        });
     }
 
     //dashinit not returned
@@ -301,5 +364,10 @@ public class SuperLive {
 
     public static Request GET(String url) {
         return new Request.Builder().url(url).build();
+    }
+
+    private static int fourccToInt(String string) {
+        byte[] bytes = string.getBytes();
+        return bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3];
     }
 }

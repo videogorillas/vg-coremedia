@@ -92,7 +92,7 @@ public class RxDash {
         return buf;
     }
 
-    private static FileTypeBox dashFtyp() {
+    public static FileTypeBox dashFtyp() {
         return FileTypeBox.createFileTypeBox("iso5", 1, Arrays.asList("avc1", "iso5", "mpd"));
     }
 
