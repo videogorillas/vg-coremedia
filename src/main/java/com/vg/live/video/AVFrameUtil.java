@@ -215,8 +215,9 @@ public class AVFrameUtil {
         for(AVFrame f : x) {
             if (f.isVideo()) {
                 sb.append(f.iframe ? "I" : "V");
+            } else {
+                sb.append(f.type);
             }
-            sb.append(f.type);
         }
         return sb.toString();
     }
