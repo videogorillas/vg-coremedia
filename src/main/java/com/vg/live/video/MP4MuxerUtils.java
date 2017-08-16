@@ -10,6 +10,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.primitives.Ints.checkedCast;
 import static com.vg.live.video.AVFrameUtil.annexb2mp4;
 import static java.util.Arrays.asList;
+import static java8.util.stream.StreamSupport.stream;
 import static org.apache.commons.io.IOUtils.closeQuietly;
 import static org.jcodec.codecs.h264.H264Utils.parseAVCC;
 import static org.jcodec.codecs.h264.H264Utils.readPPSFromBufferList;
@@ -62,7 +63,6 @@ import org.jcodec.containers.mp4.muxer.MP4MuxerTrack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
 import com.vg.live.worker.Allocator;
 import com.vg.live.worker.SimpleAllocator;
 
@@ -305,7 +305,7 @@ public class MP4MuxerUtils {
 
         List<AbstractMP4DemuxerTrack> tracks = getAVTracks(demuxer);
 
-        tracks.stream().filter(t -> t.getBox().isAudio()).forEach(t -> {
+        stream(tracks).filter(t -> t.getBox().isAudio()).forEach(t -> {
             AudioSampleEntry ase = (AudioSampleEntry) firstElement(t.getSampleEntries());
             adts[t.getNo()] = ADTSHeader.adtsFromAudioSampleEntry(ase);
         });

@@ -8,17 +8,16 @@ import static com.google.common.primitives.Ints.checkedCast;
 import static com.vg.live.DashUtil.createMovieHeader;
 import static com.vg.live.MP4Segment.fillArrayIfNull;
 import static com.vg.live.video.ADTSHeader.adtsFromAudioSampleEntry;
-import static com.vg.live.video.MP4MuxerUtils.concatMapOnFirst;
 import static com.vg.live.video.MP4MuxerUtils.populateSpsPps;
 import static com.vg.live.video.RxDash.createTrack;
 import static com.vg.live.video.RxDash.m4sFromFrames;
-import static com.vg.live.video.RxDash.trex;
 import static com.vg.util.MediaSeq.mediaSeq;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.toHexString;
 import static java.lang.System.identityHashCode;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java8.util.stream.StreamSupport.stream;
 import static org.jcodec.common.io.ByteBufferSeekableByteChannel.readFromByteBuffer;
 import static org.jcodec.containers.mp4.boxes.MovieExtendsBox.createMovieExtendsBox;
 import static org.jcodec.containers.mp4.boxes.MovieExtendsHeaderBox.createMovieExtendsHeaderBox;
@@ -26,13 +25,11 @@ import static rx.Observable.just;
 import static rx.Observable.range;
 import static rx.schedulers.Schedulers.newThread;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
 import org.jcodec.containers.mp4.boxes.Box;
@@ -303,7 +300,7 @@ public class SuperLive {
 
                 if (moov == null) {
                     moov = MovieBox.createMovieBox();
-                    int timescale = frameList.stream().mapToInt(f -> checkedCast(f.timescale)).findFirst().orElse(0);
+                    int timescale = stream(frameList).mapToInt(f -> checkedCast(f.timescale)).findFirst().orElse(0);
                     checkState(timescale > 0, "BUG: no timescale for frame list %s", frameList);
                     moov.add(createMovieHeader(timescale, 3));
                     mvex = createMovieExtendsBox();
@@ -311,20 +308,20 @@ public class SuperLive {
                     moov.add(mvex);
                 }
 
-                boolean hasAudio = frameList.stream().anyMatch(f -> f.isAudio());
-                boolean hasVideo = frameList.stream().anyMatch(f -> f.isVideo());
+                boolean hasAudio = stream(frameList).anyMatch(f -> f.isAudio());
+                boolean hasVideo = stream(frameList).anyMatch(f -> f.isVideo());
                 boolean updateVideo = hasVideo && moov.getVideoTrack() == null;
                 boolean updateAudio = hasAudio && moov.getAudioTracks().isEmpty();
 
                 if (updateVideo) {
-                    AVFrame video = frameList.stream().filter(f -> f.isVideo()).findFirst().orElse(null);
+                    AVFrame video = stream(frameList).filter(f -> f.isVideo()).findFirst().orElse(null);
                     checkNotNull(video, "BUG: video frame not found in frame list %s", frameList);
                     mvex.add(RxDash.trex(VIDEO_TRACKID));
                     moov.add(createTrack(VIDEO_TRACKID, video));
                 }
 
                 if (updateAudio) {
-                    AVFrame audio = frameList.stream().filter(f -> f.isAudio()).findFirst().orElse(null);
+                    AVFrame audio = stream(frameList).filter(f -> f.isAudio()).findFirst().orElse(null);
                     checkNotNull(audio, "BUG: audio frame not found in frame list %s", frameList);
                     mvex.add(RxDash.trex(AUDIO_TRACKID));
                     moov.add(createTrack(AUDIO_TRACKID, audio));

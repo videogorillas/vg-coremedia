@@ -119,6 +119,12 @@
 	</build>
 
 	<dependencies>
+            <!-- https://mvnrepository.com/artifact/net.sourceforge.streamsupport/streamsupport -->
+        <dependency>
+            <groupId>net.sourceforge.streamsupport</groupId>
+            <artifactId>streamsupport</artifactId>
+            <version>1.5.6</version>
+        </dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
