@@ -158,7 +158,6 @@ public class RxWebSocket {
 
     public static Observable<ByteBuffer> sendBuf(Observable<WebSocket> ws, ByteBuffer buf, long maxTimeMsec) {
         Observable<ByteBuffer> sendBuf = RxWebSocket.sendBuf(ws, buf);
-//        sendBuf = sendBuf.timeout(maxTimeMsec, MILLISECONDS);
         return sendBuf.retryWhen(errors -> errors.concatMap(err -> {
             int sz = buf.remaining();
             String id = Integer.toHexString(System.identityHashCode(buf)) + "/" + sz;
