@@ -15,7 +15,7 @@ dependencies {
 	testCompile 'junit:junit:4.12'
     compile 'commons-io:commons-io:2.4'
     compile 'org.apache.commons:commons-lang3:3.5'
-    compile 'org.jcodec:jcodec:0.2.0'
+    compile 'org.jcodec:jcodec:0.2.1'
     compile 'com.google.guava:guava:20.0'
     compile 'com.squareup.okhttp:okhttp:2.7.5'
     compile 'com.squareup.okhttp:okhttp-ws:2.7.5'
