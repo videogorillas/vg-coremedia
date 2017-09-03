@@ -179,7 +179,7 @@ public class SuperLive {
 
             if (data.capacity() < voff + sampleSize) {
                 log.error("Ignore frames: bb capacity={} position={}", data.capacity(), (voff + sampleSize));
-                continue;
+                break;
             }
 
             data.limit(voff + sampleSize);
