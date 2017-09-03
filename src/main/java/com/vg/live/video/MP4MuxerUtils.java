@@ -198,13 +198,24 @@ public class MP4MuxerUtils {
                 entryNo, fileOff, size, psync);
     }
 
+    private static int profileCompat(SeqParameterSet sps) {
+        int pc = 0;
+        pc |= (sps.constraintSet0Flag ? (1 << 7) : pc);
+        pc |= (sps.constraintSet1Flag ? (1 << 6) : pc);
+        pc |= (sps.constraintSet2Flag ? (1 << 5) : pc);
+        pc |= (sps.constraintSet3Flag ? (1 << 4) : pc);
+        pc |= (sps.constraintSet4Flag ? (1 << 3) : pc);
+        pc |= (sps.constraintSet5Flag ? (1 << 2) : pc);
+        return pc;
+    }
+
     public static SampleEntry videoSampleEntry(AVFrame videoFrame) {
         checkNotNull(videoFrame);
         checkNotNull(videoFrame.getSps(), "sps not found in videoFrame %s", videoFrame);
         SeqParameterSet sps = videoFrame.getSps();
         int nalLenSize = 4;
 
-        AvcCBox avcC = AvcCBox.createAvcCBox(sps.profileIdc, 0, sps.levelIdc, nalLenSize, asList(videoFrame.spsBuf),
+        AvcCBox avcC = AvcCBox.createAvcCBox(sps.profileIdc, profileCompat(sps), sps.levelIdc, nalLenSize, asList(videoFrame.spsBuf),
                 asList(videoFrame.ppsBuf));
 
         SampleEntry sampleEntry = H264Utils.createMOVSampleEntryFromAvcC(avcC);
