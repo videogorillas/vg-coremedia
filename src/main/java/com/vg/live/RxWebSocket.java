@@ -5,6 +5,7 @@ import static com.squareup.okhttp.ws.WebSocket.TEXT;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeoutException;
 
@@ -85,7 +86,7 @@ public class RxWebSocket {
         });
 
         this.openWebSockets = this.wsEvents.filter(e -> e.type.equals(OPEN)).map(e -> e.ws).doOnNext(ws -> {
-            log.debug("getOpenWebSockets open " + ws);
+            log.debug("getOpenWebSockets open {}", ws);
         }).replay(1).refCount();
     }
     
@@ -111,16 +112,16 @@ public class RxWebSocket {
 
     public static Observable<WebSocketEvent> webSocket(OkHttpClient c, Request request) {
         return Observable.create(o -> {
-            log.debug("webSocket " + request);
+            log.debug("webSocket {}", request);
             WebSocketCall call = WebSocketCall.create(c, request);
             WebSocket ws[] = new WebSocket[1];
             o.setCancellation(() -> {
                 if (ws[0] != null) {
                     ws[0].close(1000, "canceled");
                 }
-                log.debug("cancel ws "+request);
+                log.debug("cancel ws {}", request);
                 call.cancel();
-                log.debug("canceled ws "+request);
+                log.debug("canceled ws {}", request);
             });
 
 
@@ -157,10 +158,11 @@ public class RxWebSocket {
 
     public static Observable<ByteBuffer> sendBuf(Observable<WebSocket> ws, ByteBuffer buf, long maxTimeMsec) {
         Observable<ByteBuffer> sendBuf = RxWebSocket.sendBuf(ws, buf);
-        sendBuf = sendBuf.timeout(maxTimeMsec, MILLISECONDS);
         return sendBuf.retryWhen(errors -> errors.concatMap(err -> {
-            log.error("retry send buf: " + buf.remaining() + " because " + err);
-            if (err instanceof TimeoutException) {
+            int sz = buf.remaining();
+            String id = Integer.toHexString(System.identityHashCode(buf)) + "/" + sz;
+            log.error("retry send buf {} because {}", id, err.toString());
+            if (err instanceof TimeoutException || err instanceof SocketTimeoutException) {
                 return Observable.just("x");
             }
             return Observable.just("x").delay(maxTimeMsec, MILLISECONDS);
@@ -169,17 +171,19 @@ public class RxWebSocket {
     
     public static Observable<ByteBuffer> sendBuf(Observable<WebSocket> ws, ByteBuffer buf) {
         Observable<ByteBuffer> sent = ws.take(1).concatMap(_ws -> {
-            log.debug("_ws " + _ws);
-            RequestBody message = RequestBody.create(BINARY, buf.array(), buf.arrayOffset(), buf.remaining());
+            int sz = buf.remaining();
+            String id = Integer.toHexString(System.identityHashCode(buf)) + "/" + sz;
+            log.debug("_ws {}", _ws);
+            RequestBody message = RequestBody.create(BINARY, buf.array(), buf.arrayOffset(), sz);
             return Observable.fromCallable(() -> {
-                log.debug("sending " + message.contentLength() + " bytes");
+                log.debug("sending {}", id);
                 try {
                     _ws.sendMessage(message);
                 } catch (IOException e) {
-                    log.error("error sendBuf " + e);
+                    log.error("error sendBuf {} {}", id, e.toString());
                     _ws.close(1000, "hz");
                 }
-                log.debug("sent " + message.contentLength() + " bytes");
+                log.debug("sent {}", id);
                 return buf;
             });
         });
@@ -190,7 +194,7 @@ public class RxWebSocket {
         Observable<String> sendBuf = RxWebSocket.sendText(ws, buf);
         sendBuf = sendBuf.timeout(maxTimeMsec, MILLISECONDS);
         return sendBuf.retryWhen(errors -> errors.concatMap(err -> {
-            log.error("{}", "retry send text of size " + buf.length() + " because " + err);
+            log.error("retry send text of size {} because {}", buf.length(), err.toString());
             if (err instanceof TimeoutException) {
                 return Observable.just("x");
             }
@@ -199,19 +203,19 @@ public class RxWebSocket {
     }
     
     public static Observable<String> sendText(Observable<WebSocket> ws, String text) {
-        log.debug("sendText " + text);
+        log.trace("sendText {}", text);
         Observable<String> sent = ws.take(1).concatMap(_ws -> {
             log.debug("_ws " + _ws);
             RequestBody message = RequestBody.create(TEXT, text);
             return Observable.fromCallable(() -> {
-                log.debug("sending " + message.contentLength() + " bytes");
+                log.debug("sending {} bytes", message.contentLength());
                 try {
                     _ws.sendMessage(message);
                 } catch (IOException e) {
-                    log.error("error sendText " + e);
+                    log.error("error sendText {}", e.toString());
                     _ws.close(1000, "hz");
                 }
-                log.debug("sent " + message.contentLength() + " bytes");
+                log.debug("sent {} bytes", message.contentLength());
                 return text;
             });
         });
@@ -220,8 +224,8 @@ public class RxWebSocket {
     
     public static Observable<WebSocketEvent> reconnectWebSocket(OkHttpClient c, String url, long reconnectMsec) {
         return webSocket(c, GET(url))
-                .repeatWhen(e -> e.doOnNext(err -> log.error("repeat " + err)).delay(reconnectMsec, MILLISECONDS))
-                .retryWhen(e -> e.doOnNext(err -> log.error("retry " + err)).delay(reconnectMsec, MILLISECONDS));
+                .repeatWhen(e -> e.doOnNext(err -> log.error("repeat {}", err.toString())).delay(reconnectMsec, MILLISECONDS))
+                .retryWhen(e -> e.doOnNext(err -> log.error("retry {}", err.toString())).delay(reconnectMsec, MILLISECONDS));
     }
     
     public static Request GET(String url) {

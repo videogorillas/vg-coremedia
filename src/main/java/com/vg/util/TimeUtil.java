@@ -23,10 +23,17 @@ public class TimeUtil {
     }
 
     public static String hms(long sec) {
-        long s = sec % 60;
-        long m = sec % 3600 / 60;
-        long h = sec / 3600;
-        return String.format("%02d:%02d:%02d", h, m, s);
+        int s = (int) (sec % 60);
+        int m = (int) (sec % 3600 / 60);
+        int h = (int) (sec / 3600);
+
+        StringBuilder sb = new StringBuilder(8);
+        sb = 0 <= h && h < 10 ? sb.append(zeroToNine[h]) : sb.append(h);
+        sb.append(":");
+        sb = 0 <= m && m < 10 ? sb.append(zeroToNine[m]) : sb.append(m);
+        sb.append(":");
+        sb = 0 <= s && s < 10 ? sb.append(zeroToNine[s]) : sb.append(s);
+        return sb.toString();
     }
 
     public static Date macTimeToDate(long macTimeSec) {

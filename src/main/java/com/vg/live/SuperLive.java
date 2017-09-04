@@ -179,7 +179,7 @@ public class SuperLive {
 
             if (data.capacity() < voff + sampleSize) {
                 log.error("Ignore frames: bb capacity={} position={}", data.capacity(), (voff + sampleSize));
-                continue;
+                break;
             }
 
             data.limit(voff + sampleSize);
@@ -327,15 +327,19 @@ public class SuperLive {
                     moov.add(createTrack(AUDIO_TRACKID, audio));
                 }
 
+                ByteBuffer m4s = m4sFromFrames(frameList, mseq, allocator);
+                for(AVFrame frame : frameList) {
+                    allocator.releaseData(frame);
+                }
                 if (updateVideo || updateAudio) {
                     FileTypeBox ftyp = RxDash.dashFtyp();
                     ByteBuffer dashinit = allocator.acquire(4096);
                     ftyp.write(dashinit);
                     moov.write(dashinit);
                     dashinit.flip();
-                    return just(dashinit, m4sFromFrames(frameList, mseq, allocator));
+                    return just(dashinit, m4s);
                 }
-                return just(m4sFromFrames(frameList, mseq, allocator));
+                return just(m4s);
             }
         });
     }
