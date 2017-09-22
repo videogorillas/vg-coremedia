@@ -4,6 +4,7 @@ import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class AVFrame {
     public static final String VIDEO_FRAME = "V";
@@ -17,6 +18,7 @@ public class AVFrame {
     public Long dts;
     public long streamOffset;
     public int streamSize;
+    public AtomicInteger refCount = new AtomicInteger(1);
     public transient ByteBuffer _data;
     public int dataSize;
     public int dataOffset;
@@ -99,5 +101,10 @@ public class AVFrame {
             d = new Dimension(w, h);
         }
         return d;
+    }
+
+    public AVFrame retain() {
+        refCount.incrementAndGet();
+        return this;
     }
 }

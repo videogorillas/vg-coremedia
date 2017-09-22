@@ -25,7 +25,9 @@ public class FramePoolAllocator implements Allocator {
 
     @Override
     public void releaseData(AVFrame f) {
-        FramePool.releaseData(f);
+        if (f.refCount.decrementAndGet() <= 0) {
+            FramePool.releaseData(f);
+        }
     }
 
     @Override
