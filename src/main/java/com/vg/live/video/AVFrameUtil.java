@@ -32,7 +32,7 @@ public class AVFrameUtil {
     public static AVFrame annexb2mp4(AVFrame f) {
         ByteBuffer data = f.data();
         if (f.isVideo() && data.getInt(data.position()) == 0x00000001) {
-            H264Utils.encodeMOVPacket(data);
+            H264Utils.encodeMOVPacketInplace(data);
         }
         return f;
     }

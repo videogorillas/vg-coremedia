@@ -16,7 +16,7 @@ import com.vg.live.video.PESPacket;
 import com.vg.live.video.TSPkt;
 import com.vg.util.MappedByteBufferPool;
 
-class FramePool {
+public class FramePool {
     static MappedByteBufferPool pool = new MappedByteBufferPool(1024);
     public static ByteBuffer acquire(int size) {
         ByteBuffer acquire = pool.acquire(nextPowerOfTwo(size), false);
@@ -86,8 +86,10 @@ class FramePool {
     }
 
     public static void releaseData(AVFrame f) {
-        release(f._data);
-        f._data = Allocator.RELEASED;
+        if (f._data != Allocator.RELEASED) {
+            release(f._data);
+            f._data = Allocator.RELEASED;
+        }
     }
 
     public static void releaseData(TSPkt pkt) {

@@ -173,7 +173,7 @@ public class RxWebSocket {
         Observable<ByteBuffer> sent = ws.take(1).concatMap(_ws -> {
             int sz = buf.remaining();
             String id = Integer.toHexString(System.identityHashCode(buf)) + "/" + sz;
-            log.debug("_ws {}", _ws);
+            log.debug("_ws {}", Integer.toHexString(System.identityHashCode(_ws)));
             RequestBody message = RequestBody.create(BINARY, buf.array(), buf.arrayOffset(), sz);
             return Observable.fromCallable(() -> {
                 log.debug("sending {}", id);
@@ -224,8 +224,8 @@ public class RxWebSocket {
     
     public static Observable<WebSocketEvent> reconnectWebSocket(OkHttpClient c, String url, long reconnectMsec) {
         return webSocket(c, GET(url))
-                .repeatWhen(e -> e.doOnNext(err -> log.error("repeat {}", err.toString())).delay(reconnectMsec, MILLISECONDS))
-                .retryWhen(e -> e.doOnNext(err -> log.error("retry {}", err.toString())).delay(reconnectMsec, MILLISECONDS));
+                .repeatWhen(e -> e.doOnNext(x -> log.error("repeat {}", x)).delay(reconnectMsec, MILLISECONDS))
+                .retryWhen(e -> e.doOnNext(err -> log.error("retry {}", err.toString(), err)).delay(reconnectMsec, MILLISECONDS));
     }
     
     public static Request GET(String url) {

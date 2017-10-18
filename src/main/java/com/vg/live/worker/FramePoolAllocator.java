@@ -25,7 +25,12 @@ public class FramePoolAllocator implements Allocator {
 
     @Override
     public void releaseData(AVFrame f) {
-        FramePool.releaseData(f);
+        int rc = f.refCount.decrementAndGet();
+        if (rc == 0) {
+            FramePool.releaseData(f);
+        } else if (rc < 0) {
+            throw new IllegalStateException("over releasing (refcnt=" + rc + ") frame " + f);
+        }
     }
 
     @Override
