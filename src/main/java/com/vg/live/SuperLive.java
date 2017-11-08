@@ -29,6 +29,16 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.ws.WebSocket;
+import com.vg.live.RxWebSocket.WebSocketEvent;
+import com.vg.live.video.AVFrame;
+import com.vg.live.video.RxDash;
+import com.vg.live.worker.Allocator;
+import com.vg.live.worker.SimpleAllocator;
+import com.vg.util.MediaSeq;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
@@ -47,16 +57,6 @@ import org.jcodec.containers.mp4.boxes.TrunBox;
 import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.ws.WebSocket;
-import com.vg.live.RxWebSocket.WebSocketEvent;
-import com.vg.live.video.AVFrame;
-import com.vg.live.video.RxDash;
-import com.vg.live.worker.Allocator;
-import com.vg.live.worker.SimpleAllocator;
-import com.vg.util.MediaSeq;
 
 import rx.Observable;
 import rx.Subscription;
@@ -181,7 +181,7 @@ public class SuperLive {
         int sampleFlags = tfhd.getDefaultSampleFlags();
 
         for (int i = 0; i < sampleCount; i++) {
-            if (!trun.isFirstSampleFlagsAvailable()) {
+            if (trun.getSamplesFlags() != null) {
                 sampleSize = checkedCast(trun.getSampleSize(i));
                 sampleDuration = sampleDurations[i];
                 sampleFlags = samplesFlags[i];
