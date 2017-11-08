@@ -41,8 +41,12 @@ public class MP4Segment {
     public TrunBox atrun;
 
     public TrunBox getTrun(int trackId) {
-        TrackFragmentBox traf = findByTrackId(moof.getTracks(), trackId);
+        TrackFragmentBox traf = getTraf(trackId);
         return NodeBox.findFirst(traf, TrunBox.class, "trun");
+    }
+
+    public TrackFragmentBox getTraf(int trackId) {
+        return findByTrackId(moof.getTracks(), trackId);
     }
 
     public long getDuration(int trackId, int defaultSampleDuration) {
@@ -73,7 +77,7 @@ public class MP4Segment {
     }
 
     public long getBaseMediaDecodeTime(int trackId) {
-        TrackFragmentBox traf = findByTrackId(moof.getTracks(), trackId);
+        TrackFragmentBox traf = getTraf(trackId);
         TrackFragmentBaseMediaDecodeTimeBox tfdt = NodeBox.findFirst(traf,
                 TrackFragmentBaseMediaDecodeTimeBox.class, "tfdt");
         long trackStartTv = tfdt.getBaseMediaDecodeTime();
