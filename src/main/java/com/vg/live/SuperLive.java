@@ -34,10 +34,14 @@ import org.jcodec.containers.mp4.MP4Util;
 import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
 import org.jcodec.containers.mp4.boxes.Box;
 import org.jcodec.containers.mp4.boxes.FileTypeBox;
+import org.jcodec.containers.mp4.boxes.Header;
 import org.jcodec.containers.mp4.boxes.MovieBox;
 import org.jcodec.containers.mp4.boxes.MovieExtendsBox;
 import org.jcodec.containers.mp4.boxes.NodeBox;
 import org.jcodec.containers.mp4.boxes.TrackExtendsBox;
+import org.jcodec.containers.mp4.boxes.TrackFragmentBox;
+import org.jcodec.containers.mp4.boxes.TrackFragmentHeaderBox;
+import org.jcodec.containers.mp4.boxes.TrackHeaderBox;
 import org.jcodec.containers.mp4.boxes.TrakBox;
 import org.jcodec.containers.mp4.boxes.TrunBox;
 import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
@@ -130,8 +134,10 @@ public class SuperLive {
                     ase = (AudioSampleEntry) track.getSampleEntries()[0];
                 }
 
-                int trackId = track.getTrackHeader().getTrackId();
+                TrackHeaderBox tfhd = track.getTrackHeader();
+                int trackId = tfhd.getTrackId();
                 TrunBox trun = m4s.getTrun(trackId);
+                TrackFragmentBox traf = m4s.getTraf(trackId);
                 TrackExtendsBox trex = trex(trexs, trackId);
 
                 if (trun == null) {
@@ -140,7 +146,7 @@ public class SuperLive {
                 }
 
                 long pts = m4s.getBaseMediaDecodeTime(trackId);
-                List<AVFrame> _frames = fromTrun(track.isVideo(), trun, trex, data);
+                List<AVFrame> _frames = fromTrun(track.isVideo(), trun, trex, traf, data);
                 for (AVFrame f : _frames) {
                     f.pts = pts;
                     f.timescale = track.getTimescale();
@@ -160,7 +166,7 @@ public class SuperLive {
         return concatMap;
     }
 
-    static List<AVFrame> fromTrun(boolean video, TrunBox trun, TrackExtendsBox trex, ByteBuffer data) {
+    static List<AVFrame> fromTrun(boolean video, TrunBox trun, TrackExtendsBox trex, TrackFragmentBox traf, ByteBuffer data) {
         int sampleCount = checkedCast(trun.getSampleCount());
 
         // 68: styp + sidx
@@ -169,10 +175,17 @@ public class SuperLive {
         int[] sampleDurations = fillArrayIfNull(trun.getSampleDurations(), sampleCount, trex.getDefaultSampleDuration());
         int[] samplesFlags = fillArrayIfNull(trun.getSamplesFlags(), sampleCount, trex.getDefaultSampleFlags());
 
+        TrackFragmentHeaderBox tfhd = new TrackFragmentHeaderBox(new Header(traf.getHeader().getFourcc()));
+        int sampleSize = checkedCast(tfhd.getDefaultSampleSize());
+        int sampleDuration = tfhd.getDefaultSampleDuration();
+        int sampleFlags = tfhd.getDefaultSampleFlags();
+
         for (int i = 0; i < sampleCount; i++) {
-            int sampleSize = checkedCast(trun.getSampleSize(i));
-            int sampleDuration = sampleDurations[i];
-            int sampleFlags = samplesFlags[i];
+            if (!trun.isFirstSampleFlagsAvailable()) {
+                sampleSize = checkedCast(trun.getSampleSize(i));
+                sampleDuration = sampleDurations[i];
+                sampleFlags = samplesFlags[i];
+            }
             boolean iframe = (sampleFlags & 0x02000000) != 0;
             AVFrame f = video ? AVFrame.video(voff, sampleSize, iframe) : AVFrame.audio(voff, sampleSize);
             f.duration = sampleDuration;
