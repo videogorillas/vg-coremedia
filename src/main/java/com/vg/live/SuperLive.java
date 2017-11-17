@@ -172,7 +172,7 @@ public class SuperLive {
         int voff = trun.getDataOffset() + 68;
         List<AVFrame> _frames = new ArrayList<>();
 
-        TrackFragmentHeaderBox tfhd = new TrackFragmentHeaderBox(new Header(traf.getHeader().getFourcc()));
+        TrackFragmentHeaderBox tfhd = NodeBox.findFirst(traf, TrackFragmentHeaderBox.class, "tfhd");
 
         int sampleDurationTrex = trex.getDefaultSampleDuration();
         int sampleFlagsTrex = trex.getDefaultSampleFlags();
