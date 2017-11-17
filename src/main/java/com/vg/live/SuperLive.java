@@ -182,10 +182,15 @@ public class SuperLive {
 
         for (int i = 0; i < sampleCount; i++) {
             if (trun.getSamplesFlags() != null) {
-                sampleSize = checkedCast(trun.getSampleSize(i));
-                sampleDuration = sampleDurations[i];
                 sampleFlags = samplesFlags[i];
             }
+            if (trun.getSampleSizes() != null) {
+                sampleSize = checkedCast(trun.getSampleSize(i));
+            }
+            if (trun.getSampleDurations() != null) {
+                sampleDuration = sampleDurations[i];
+            }
+
             boolean iframe = (sampleFlags & 0x02000000) != 0;
             AVFrame f = video ? AVFrame.video(voff, sampleSize, iframe) : AVFrame.audio(voff, sampleSize);
             f.duration = sampleDuration;
