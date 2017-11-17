@@ -9,10 +9,10 @@ import static rx.Observable.just;
 import java.io.File;
 import java.nio.ByteBuffer;
 
-import com.vg.live.video.AVFrame;
-
 import org.junit.Assert;
 import org.junit.Test;
+
+import com.vg.live.video.AVFrame;
 
 import rx.Observable;
 
@@ -24,7 +24,10 @@ public class SuperLiveTest {
         File m4s = new File("testdata/trun/stream-0.42.m4s");
         File file = new File("testdata/trun/stream-0.116.m4s");
 
-        Observable<ByteBuffer> bufs = just(init, m4s, file).map(f1(f -> wrap(readFileToByteArray(f))));
+        Observable<ByteBuffer> bufs = just(init, m4s, file).map(f1(f -> {
+            System.out.println("f=" + f.getAbsolutePath());
+            return wrap(readFileToByteArray(f));
+        }));
         Observable<AVFrame> frames = framesFromDashBuffers(bufs);
         int first = frames.count().toBlocking().first();
 
