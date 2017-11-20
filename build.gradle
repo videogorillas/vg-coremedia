@@ -1,9 +1,14 @@
 apply plugin: 'java'
 apply plugin: 'me.tatarka.retrolambda'
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+}
+
 buildscript {
     repositories {
-        mavenLocal()
         jcenter()
     }
     dependencies {
