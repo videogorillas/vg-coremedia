@@ -6,7 +6,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.primitives.Ints.checkedCast;
 import static com.vg.live.DashUtil.createMovieHeader;
-import static com.vg.live.MP4Segment.fillArrayIfNull;
 import static com.vg.live.video.ADTSHeader.adtsFromAudioSampleEntry;
 import static com.vg.live.video.MP4MuxerUtils.populateSpsPps;
 import static com.vg.live.video.RxDash.createTrack;
@@ -172,20 +171,48 @@ public class SuperLive {
         // 68: styp + sidx
         int voff = trun.getDataOffset() + 68;
         List<AVFrame> _frames = new ArrayList<>();
-        int[] sampleDurations = fillArrayIfNull(trun.getSampleDurations(), sampleCount, trex.getDefaultSampleDuration());
-        int[] samplesFlags = fillArrayIfNull(trun.getSamplesFlags(), sampleCount, trex.getDefaultSampleFlags());
 
-        TrackFragmentHeaderBox tfhd = new TrackFragmentHeaderBox(new Header(traf.getHeader().getFourcc()));
-        int sampleSize = checkedCast(tfhd.getDefaultSampleSize());
-        int sampleDuration = tfhd.getDefaultSampleDuration();
-        int sampleFlags = tfhd.getDefaultSampleFlags();
+        TrackFragmentHeaderBox tfhd = NodeBox.findFirst(traf, TrackFragmentHeaderBox.class, "tfhd");
+
+        int sampleDurationTrex = trex.getDefaultSampleDuration();
+        int sampleFlagsTrex = trex.getDefaultSampleFlags();
+
+        int sampleDurationTfhd = tfhd.getDefaultSampleDuration();
+        int sampleFlagsTfhd = tfhd.getDefaultSampleFlags();
+        int sampleSizeTfhd = tfhd.getDefaultSampleSize();
+
+        int[] samplesDurations = trun.getSampleDurations();
+        int[] samplesFlags = trun.getSamplesFlags();
+        int[] samplesSizes = trun.getSampleSizes();
 
         for (int i = 0; i < sampleCount; i++) {
-            if (!trun.isFirstSampleFlagsAvailable()) {
-                sampleSize = checkedCast(trun.getSampleSize(i));
-                sampleDuration = sampleDurations[i];
+            int sampleFlags;
+            if (i == 0 && trun.isFirstSampleFlagsAvailable()) {
+                sampleFlags = trun.getFirstSampleFlags();
+            } else if (samplesFlags != null && samplesFlags.length > i) {
                 sampleFlags = samplesFlags[i];
+            } else if (sampleFlagsTfhd != sampleFlagsTrex) {
+                sampleFlags = sampleFlagsTfhd;
+            } else {
+                sampleFlags = sampleFlagsTrex;
             }
+
+            int sampleDuration;
+            if (samplesDurations != null && samplesDurations.length >i){
+                sampleDuration = samplesDurations[i];
+            } else if (sampleDurationTfhd != sampleDurationTrex) {
+                sampleDuration = sampleDurationTfhd;
+            } else {
+                sampleDuration = sampleDurationTrex;
+            }
+            
+            int sampleSize;
+            if (samplesSizes != null && samplesSizes.length > i){
+                sampleSize = samplesSizes[i];
+            } else {
+                sampleSize = sampleSizeTfhd;
+            }
+
             boolean iframe = (sampleFlags & 0x02000000) != 0;
             AVFrame f = video ? AVFrame.video(voff, sampleSize, iframe) : AVFrame.audio(voff, sampleSize);
             f.duration = sampleDuration;
