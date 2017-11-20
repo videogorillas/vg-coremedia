@@ -42,10 +42,9 @@ public class SuperLiveTest {
         File init = new File(M4S_INIT);
         File m4s = new File(M4S);
 
-        Observable<ByteBuffer> bufs = just(init, m4s).map(f1(f -> {
-            System.out.println("f=" + f.getAbsolutePath());
-            return wrap(readFileToByteArray(f));
-        }));
+        Observable<ByteBuffer> bufs = just(init, m4s)
+                .doOnNext(f -> System.out.println("f=" + f.getAbsolutePath()))
+                .map(f1(f -> wrap(readFileToByteArray(f))));
         Observable<AVFrame> frames = framesFromDashBuffers(bufs);
         int framesCount = frames.count().toBlocking().first();
 
